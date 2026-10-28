@@ -15,9 +15,10 @@ import binance_cascade_hunter as strategy
 class PaperExchange:
     """Explicit public-data allowlist. Orders and balances exist only in memory."""
 
-    def __init__(self, market_data, fee_rate=0.0005):
+    def __init__(self, market_data, fee_rate=0.0005, leverage=None):
         self.market_data = market_data
         self.fee_rate = fee_rate
+        self.leverage = strategy.LEVERAGE if leverage is None else leverage
         self.balance = 100.0
         self.positions = {}
         self.prices = {}
@@ -64,7 +65,7 @@ class PaperExchange:
 
     async def set_leverage(self, leverage, symbol):
         # Never call a private Binance endpoint.
-        if leverage != strategy.LEVERAGE:
+        if leverage != self.leverage:
             raise ValueError("Leverage must match the original strategy")
 
     async def create_order(self, symbol, type, side, amount, params=None):
@@ -98,7 +99,7 @@ class PaperExchange:
                     raise ValueError(f"Below market minimum {key}")
                 if bounds.get("max") is not None and value > bounds["max"]:
                     raise ValueError(f"Above market maximum {key}")
-            margin = notional / strategy.LEVERAGE
+            margin = notional / self.leverage
             if margin + fee > self.free:
                 raise ValueError("Insufficient virtual margin including entry fee")
             self.balance -= fee
