@@ -4,3 +4,5 @@ __pycache__/
 .env
 paper_state*.json
 paper_state*.json.tmp
+data/*_1m.json
+backtest_results/
