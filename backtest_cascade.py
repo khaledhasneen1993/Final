@@ -122,11 +122,12 @@ def rounded_amount(amount, rule):
 
 
 class Backtest:
-    def __init__(self, candles, rules, fee_rate=0.0005):
+    def __init__(self, candles, rules, fee_rate=0.0005, config=strategy):
         self.candles = candles
         self.symbols = list(candles)
         self.rules = rules
         self.fee_rate = fee_rate
+        self.config = config
         self.balance = 100.0
         self.positions = {}
         self.last_entry = {}
@@ -141,12 +142,12 @@ class Backtest:
         return max(0.0, self.balance - sum(p["margin"] for p in self.positions.values()))
 
     def enter(self, symbol, side, price, reference, timestamp):
-        if timestamp - self.last_entry.get(symbol, -10**20) < strategy.COOLDOWN_SEC * 1000:
+        if timestamp - self.last_entry.get(symbol, -10**20) < self.config.COOLDOWN_SEC * 1000:
             return
         rule = self.rules[symbol]
-        amount = rounded_amount(self.free * strategy.MAX_POSITION_PCT * strategy.LEVERAGE / price, rule)
+        amount = rounded_amount(self.free * self.config.MAX_POSITION_PCT * self.config.LEVERAGE / price, rule)
         notional = amount * price
-        margin = notional / strategy.LEVERAGE
+        margin = notional / self.config.LEVERAGE
         fee = notional * self.fee_rate
         if (amount <= 0 or amount < rule["min"] or amount > rule["max"]
                 or notional < rule["min_notional"] or margin + fee > self.free):
@@ -157,10 +158,10 @@ class Backtest:
         self.positions[symbol] = {
             "side": side, "entry": price, "amount": amount, "margin": margin,
             "entry_fee": fee, "entry_time": timestamp,
-            "tp": reference * (1 + strategy.TAKE_PROFIT_PCT if side == "buy"
-                               else 1 - strategy.TAKE_PROFIT_PCT),
-            "sl": reference * (1 - strategy.STOP_LOSS_PCT if side == "buy"
-                               else 1 + strategy.STOP_LOSS_PCT),
+            "tp": reference * (1 + self.config.TAKE_PROFIT_PCT if side == "buy"
+                               else 1 - self.config.TAKE_PROFIT_PCT),
+            "sl": reference * (1 - self.config.STOP_LOSS_PCT if side == "buy"
+                               else 1 + self.config.STOP_LOSS_PCT),
         }
 
     def close(self, symbol, price, timestamp, reason):
