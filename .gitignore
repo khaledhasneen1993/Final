@@ -1,0 +1,6 @@
+__pycache__/
+*.py[cod]
+.venv/
+.env
+paper_state*.json
+paper_state*.json.tmp
