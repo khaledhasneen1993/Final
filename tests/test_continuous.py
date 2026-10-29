@@ -6,9 +6,9 @@ from unittest.mock import patch
 
 import aiohttp
 
-from binance_cascade_hunter_dynamic_paper import DynamicPaperHunter
+from binance_cascade_hunter_dynamic_v2_paper import V2PaperHunter as DynamicPaperHunter
 from continuous_scanner import CandleGap, ContinuousScanner
-from test_dynamic import DynamicPublicData
+from fixtures import DynamicPublicData
 
 NOW = 1_800_000_000_000
 BTC = "BTC/USDT:USDT"
@@ -78,13 +78,13 @@ class ContinuousTests(unittest.IsolatedAsyncioTestCase):
                     task.cancel()
                 await asyncio.gather(*workers, return_exceptions=True)
 
-    async def test_concurrent_signals_cannot_exceed_two_positions(self):
+    async def test_concurrent_signals_open_three_positions(self):
         for symbol in ("BTCUSDT", "ETHUSDT", "SOLUSDT"):
             self.scanner.ingest(event(symbol))
         with patch("continuous_scanner.BOOK_REQUEST_SPACING", 0):
             await asyncio.gather(*(self.scanner.evaluate(s) for s in (BTC, ETH, SOL)))
-        self.assertEqual(len(self.bot.positions), 2)
-        self.assertEqual(len(self.bot.exchange.trades), 2)
+        self.assertEqual(len(self.bot.positions), 3)
+        self.assertEqual(len(self.bot.exchange.trades), 3)
         self.assertGreaterEqual(self.bot.exchange.free, 0)
 
     async def test_duplicate_updates_coalesce_and_do_not_duplicate_entry(self):

@@ -1,14 +1,12 @@
-"""Dynamic top-40 scanner using a persistent 100 USDT paper account."""
+"""Continuous paper runtime for the approved V2 strategy."""
 
-import argparse
 import asyncio
-import math
 from pathlib import Path
 
 import ccxt.async_support as ccxt
 
-import binance_cascade_hunter_dynamic as dynamic
-from binance_cascade_hunter_paper import PaperCascadeHunter, PaperExchange
+import binance_cascade_hunter_dynamic_v2 as dynamic
+from paper_account import PaperState, PaperExchange
 from continuous_scanner import ContinuousScanner
 
 
@@ -17,8 +15,8 @@ class DynamicPaperExchange(PaperExchange):
         return await self.market_data.fetch_tickers()
 
 
-class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
-    def __init__(self, state_path="paper_state_dynamic.json", fee_rate=0.0005,
+class DynamicPaperHunter(dynamic.CascadeHunter, PaperState):
+    def __init__(self, state_path="paper_state_dynamic_v2.json", fee_rate=0.0005,
                  reset=False, market_data=None, strategy_config=dynamic):
         self.strategy = strategy_config
         # Neither real-trading initializer is invoked. No keys are accepted or loaded.
@@ -74,22 +72,3 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
             finally:
                 await self.exchange.close()
 
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--state", default="paper_state_dynamic.json")
-    parser.add_argument("--reset", action="store_true", help="Replace state with a fresh $100 account")
-    parser.add_argument("--fee-rate", type=float, default=0.0005,
-                        help="Assumed fee per fill; default 0.0005 (0.05%%)")
-    args = parser.parse_args()
-    if not math.isfinite(args.fee_rate) or not 0 <= args.fee_rate < 0.01:
-        parser.error("--fee-rate must be finite and in [0, 0.01)")
-    bot = DynamicPaperHunter(args.state, args.fee_rate, args.reset)
-    try:
-        asyncio.run(bot.start())
-    except KeyboardInterrupt:
-        dynamic.log.info("Dynamic paper account saved; stopped")
-
-
-if __name__ == "__main__":
-    main()

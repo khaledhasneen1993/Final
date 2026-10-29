@@ -5,7 +5,7 @@ import asyncio
 import math
 
 import binance_cascade_hunter_dynamic_v2 as v2
-from binance_cascade_hunter_dynamic_paper import DynamicPaperHunter
+from paper_runtime import DynamicPaperHunter
 
 
 class V2PaperHunter(DynamicPaperHunter):

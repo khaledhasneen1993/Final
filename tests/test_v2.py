@@ -5,9 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-import binance_cascade_hunter_dynamic as v1
 import binance_cascade_hunter_dynamic_v2 as v2
-from binance_cascade_hunter_dynamic_paper import DynamicPaperHunter
 from binance_cascade_hunter_dynamic_v2_paper import V2PaperHunter
 from continuous_scanner import ContinuousScanner
 from test_continuous import NOW, StreamData, event
@@ -58,23 +56,15 @@ class V2Tests(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(self.bot.positions)
         self.assertAlmostEqual(self.bot.exchange.balance, 20)
 
-    async def test_new_state_is_separate_and_old_parameters_stay_unchanged(self):
-        old_path = Path(self.temp.name) / "v1.json"
-        old = DynamicPaperHunter(old_path, fee_rate=0, market_data=self.data)
-        await old.enter("BTC/USDT:USDT", "buy", 100)
-        before = old_path.read_bytes()
+    async def test_incompatible_state_rejected_without_modifying_file(self):
         self.bot.save()
-        self.assertEqual(old_path.read_bytes(), before)
-        self.assertEqual(self.bot.exchange.balance, 100)
-        self.assertEqual(v1.MAX_POSITION_PCT, 0.85)
-        self.assertEqual(v1.STOP_LOSS_PCT, 0.009)
-        self.assertEqual(v1.MAX_CONCURRENT_POSITIONS, 2)
-        self.assertIs(old.scanner.config, v1)
-        self.assertIs(self.bot.scanner.config, v2)
+        state = json.loads(self.path.read_text())
+        state["settings"]["MAX_POSITION_PCT"] = 0.85
+        self.path.write_text(json.dumps(state))
+        before = self.path.read_bytes()
         with self.assertRaises(ValueError):
-            V2PaperHunter(old_path, fee_rate=0, market_data=self.data)
-        with self.assertRaises(ValueError):
-            DynamicPaperHunter(self.path, fee_rate=0, market_data=self.data)
+            V2PaperHunter(self.path, fee_rate=0, market_data=self.data)
+        self.assertEqual(self.path.read_bytes(), before)
 
     async def test_saved_v2_restores_positions_and_settings(self):
         await self.bot.enter("SOL/USDT:USDT", "buy", 100)

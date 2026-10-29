@@ -1,6 +1,0 @@
-[
-  {
-    "symbol": "GAIBUSDT",
-    "error": "{\"status\":\"fulfilled\",\"value\":{\"content\":[{\"type\":\"text\",\"text\":\"McpServerError: Invalid params: Error calling tool 'get_futures_usds_kline_candlestick_data': HTTP error 400: Bad Request - {'code': -1122, 'msg': 'Invalid symbol status.'}\"}],\"structuredContent\":{\"error\":\"McpServerError: Invalid param"
-  }
-]

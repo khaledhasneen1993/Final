@@ -1,13 +1,6 @@
-__pycache__/
-*.py[cod]
 .venv/
-.env
+__pycache__/
+*.pyc
 paper_state*.json
 paper_state*.json.tmp
-data/*_1m.json
-backtest_results/
-data/dynamic60d/hourly/
-data/dynamic60d/minutes/
-data/dynamic60d/archives/
-data/dynamic60d/*.log
-results/dynamic_*/equity.csv
+*.log

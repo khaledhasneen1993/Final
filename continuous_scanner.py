@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-import binance_cascade_hunter_dynamic as default_config
+import binance_cascade_hunter_dynamic_v2 as default_config
 
 WS_URL = "wss://fstream.binance.com/market/stream"
 MAX_EVENT_AGE = 10.0
