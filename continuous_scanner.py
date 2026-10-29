@@ -198,6 +198,8 @@ class ContinuousScanner:
                 return
             # First eligible completed check gets the slot; do not wait for all symbols.
             if await self.bot.enter(symbol, signal["side"], signal["price"]):
+                if hasattr(self.bot, "record_entry_signal"):
+                    self.bot.record_entry_signal(symbol, {**signal, "imbalance": imbalance})
                 self.entries += 1
                 self.config.log.info("CONTINUOUS ENTRY %s | move=%.3f%% volume=%.2fx imbalance=%.3f",
                                 symbol, signal["ret"] * 100, signal["spike"], imbalance)

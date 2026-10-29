@@ -45,6 +45,24 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperState):
         self.save()
         return result
 
+    def record_entry_signal(self, symbol, signal):
+        for trade in reversed(self.exchange.trades):
+            if trade["symbol"] == symbol and not trade["reduceOnly"]:
+                trade["entry_signal"] = dict(signal)
+                trade["entry_reason"] = "CASCADE_MOVE_VOLUME_ORDERBOOK"
+                position = self.positions[symbol]
+                trade["take_profit_price"] = position["tp"]
+                trade["stop_loss_price"] = position["sl"]
+                self.save()
+                break
+
+    def record_exit_reason(self, symbol, reason, trigger_price):
+        for trade in reversed(self.exchange.trades):
+            if trade["symbol"] == symbol and trade["reduceOnly"]:
+                trade["exit_reason"] = reason
+                trade["trigger_price"] = float(trigger_price)
+                break
+
     async def manage_exits(self):
         await self.strategy.CascadeHunter.manage_exits(self)
         self.save()

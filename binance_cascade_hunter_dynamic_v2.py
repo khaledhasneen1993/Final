@@ -171,6 +171,8 @@ class CascadeHunter:
                         params={"reduceOnly": True}
                     )
                     reason = "TP" if hit_tp else "SL"
+                    if hasattr(self, "record_exit_reason"):
+                        self.record_exit_reason(symbol, reason, price)
                     log.info(f"EXIT {reason} {symbol} @ {price:.4f}")
                     to_remove.append(symbol)
             except Exception as e:

@@ -4,3 +4,5 @@ __pycache__/
 paper_state*.json
 paper_state*.json.tmp
 *.log
+dashboard-config*.json
+paper_state_live_*.json
