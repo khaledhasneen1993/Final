@@ -9,6 +9,7 @@ import ccxt.async_support as ccxt
 
 import binance_cascade_hunter_dynamic as dynamic
 from binance_cascade_hunter_paper import PaperCascadeHunter, PaperExchange
+from continuous_scanner import ContinuousScanner
 
 
 class DynamicPaperExchange(PaperExchange):
@@ -30,6 +31,7 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
         self.state_path = Path(state_path)
         if self.state_path.exists() and not reset:
             self.restore()
+        self.scanner = ContinuousScanner(self)
 
     def settings(self):
         return {"mode": "dynamic_scan", **{name: getattr(dynamic, name) for name in (
@@ -49,20 +51,14 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
         self.save()
 
     async def scan_loop(self):
-        while True:
-            try:
-                await self.scan_and_trade()
-            except Exception as error:
-                dynamic.log.error("Scan cycle error: %s", error)
-            dynamic.log.info("Next scan in %s seconds...", dynamic.SCAN_INTERVAL)
-            await asyncio.sleep(dynamic.SCAN_INTERVAL)
+        await self.scanner.run()
 
     async def start(self):
         tasks = []
         try:
             await self.exchange.load_markets()
             self.save()
-            dynamic.log.info("DYNAMIC PAPER ONLY | initial=100 USDT | wallet=%.4f | state=%s",
+            dynamic.log.info("CONTINUOUS PAPER ONLY | initial=100 USDT | wallet=%.4f | state=%s",
                              self.exchange.balance, self.state_path)
             tasks = [asyncio.create_task(self.scan_loop()),
                      asyncio.create_task(self.exit_watcher()),

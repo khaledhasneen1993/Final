@@ -119,12 +119,16 @@ class DynamicTests(unittest.IsolatedAsyncioTestCase):
             self.assertAlmostEqual(bot.positions["ETH/USDT:USDT"]["amount"], 21.25)
 
     async def test_cancel_saves_and_closes_scanner_and_watcher(self):
-        task = asyncio.create_task(self.bot.start())
-        for _ in range(20):
-            await asyncio.sleep(0)
-        task.cancel()
-        with self.assertRaises(asyncio.CancelledError):
-            await task
+        async def offline_stream(scanner):
+            await asyncio.Future()
+
+        with patch("continuous_scanner.ContinuousScanner.stream_loop", offline_stream):
+            task = asyncio.create_task(self.bot.start())
+            for _ in range(20):
+                await asyncio.sleep(0)
+            task.cancel()
+            with self.assertRaises(asyncio.CancelledError):
+                await task
         self.assertTrue(self.data.closed)
         self.assertTrue(self.path.exists())
 
