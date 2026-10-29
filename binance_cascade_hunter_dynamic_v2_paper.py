@@ -1,4 +1,4 @@
-"""Separate V2 paper account: 10% wallet margin, 50x, 15% price SL, max 3."""
+"""Approved V2 account; optional local runner without dashboard publishing."""
 
 import argparse
 import asyncio
@@ -31,9 +31,6 @@ class V2PaperHunter(DynamicPaperHunter):
 
     async def set_leverage(self, symbol):
         return await v2.CascadeHunter.set_leverage(self, symbol)
-
-    async def scan_and_trade(self):
-        return await v2.CascadeHunter.scan_and_trade(self)
 
     async def exit_watcher(self):
         return await v2.CascadeHunter.exit_watcher(self)

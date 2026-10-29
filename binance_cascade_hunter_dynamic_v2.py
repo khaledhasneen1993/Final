@@ -2,9 +2,7 @@
 # target: Binance USDT-M Futures — V2: 10% wallet margin, 50x, 15% price stop, max 3
 # deps: pip install ccxt pandas numpy aiohttp
 
-import ccxt.async_support as ccxt
 import asyncio
-import numpy as np
 import pandas as pd
 from datetime import datetime, timezone
 import logging
@@ -13,8 +11,6 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(message)s")
 log = logging.getLogger("CASCADE")
 
 # === CONFIG ===
-API_KEY = "YOUR_BINANCE_API_KEY"
-API_SECRET = "YOUR_BINANCE_API_SECRET"
 
 LEVERAGE = 50
 MAX_POSITION_PCT = 0.10          # 10% من رصيد المحفظة الحالي كهامش لكل صفقة
@@ -30,16 +26,10 @@ MAX_CONCURRENT_POSITIONS = 3     # أقصى عدد مراكز مفتوحة في 
 MIN_QUOTE_VOLUME = 15_000_000    # حجم تداول 24 ساعة أدنى (USDT)
 
 class CascadeHunter:
+    """V2 strategy methods; execution is supplied by the virtual account runtime."""
+
     def __init__(self):
-        self.exchange = ccxt.binanceusdm({
-            "apiKey": API_KEY,
-            "secret": API_SECRET,
-            "enableRateLimit": True,
-            "options": {"defaultType": "future"}
-        })
-        self.last_trade = {}
-        self.positions = {}
-        self.lock = asyncio.Lock()
+        raise RuntimeError("Use V2PaperHunter or run_paper_live.py for the paper account")
 
     async def set_leverage(self, symbol):
         try:
@@ -181,43 +171,6 @@ class CascadeHunter:
         for s in to_remove:
             del self.positions[s]
 
-    async def scan_and_trade(self):
-        """المسح الرئيسي كل 10 دقائق"""
-        log.info("=== Starting market scan ===")
-        symbols = await self.get_top_symbols()
-
-        signals = []
-        # نفحص العملات بشكل متوازي مع حد معقول
-        sem = asyncio.Semaphore(8)
-
-        async def check(sym):
-            async with sem:
-                return await self.detect_cascade(sym)
-
-        results = await asyncio.gather(*[check(s) for s in symbols])
-        for res in results:
-            if res and (res["long"] or res["short"]):
-                signals.append(res)
-
-        if not signals:
-            log.info("No cascade signals found this scan")
-            return
-
-        # رتب حسب القوة
-        signals.sort(key=lambda x: x["strength"], reverse=True)
-        log.info(f"Found {len(signals)} signals. Top: {signals[0]['symbol']} strength={signals[0]['strength']:.3f}")
-
-        async with self.lock:
-            await self.manage_exits()
-
-            for sig in signals:
-                if len(self.positions) >= MAX_CONCURRENT_POSITIONS:
-                    break
-                if sig["symbol"] in self.positions:
-                    continue
-
-                side = "buy" if sig["long"] else "sell"
-                await self.enter(sig["symbol"], side, sig["price"])
 
     async def exit_watcher(self):
         """مراقبة الخروج بشكل مستمر بين المسحات"""
@@ -230,18 +183,6 @@ class CascadeHunter:
                 log.error(f"Exit watcher error: {e}")
                 await asyncio.sleep(15)
 
-    async def start(self):
-        # نبدأ مهام الخروج المستمرة
-        asyncio.create_task(self.exit_watcher())
-
-        while True:
-            try:
-                await self.scan_and_trade()
-            except Exception as e:
-                log.error(f"Scan cycle error: {e}")
-            log.info(f"Next scan in {SCAN_INTERVAL} seconds...")
-            await asyncio.sleep(SCAN_INTERVAL)
 
 if __name__ == "__main__":
-    bot = CascadeHunter()
-    asyncio.run(bot.start())
+    raise SystemExit("Strategy module only. Run: python -u run_paper_live.py")

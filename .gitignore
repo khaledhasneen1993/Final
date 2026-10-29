@@ -1,8 +1,10 @@
 .venv/
 __pycache__/
-*.pyc
+*.py[cod]
+*.log
 paper_state*.json
 paper_state*.json.tmp
-*.log
 dashboard-config*.json
-paper_state_live_*.json
+.env
+.env.*
+.pytest_cache/

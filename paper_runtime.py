@@ -19,7 +19,7 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperState):
     def __init__(self, state_path="paper_state_dynamic_v2.json", fee_rate=0.0005,
                  reset=False, market_data=None, strategy_config=dynamic):
         self.strategy = strategy_config
-        # Neither real-trading initializer is invoked. No keys are accepted or loaded.
+        # Only public market data is used; all fills go through PaperExchange.
         public = market_data if market_data is not None else ccxt.binanceusdm({
             "enableRateLimit": True, "options": {"defaultType": "future"},
         })
@@ -40,7 +40,7 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperState):
         )}}
 
     async def enter(self, symbol, side, price):
-        # scan_and_trade already owns the lock; reacquiring it here would deadlock.
+        # ContinuousScanner owns the entry lock; do not acquire it again here.
         result = await self.strategy.CascadeHunter.enter(self, symbol, side, float(price))
         self.save()
         return result

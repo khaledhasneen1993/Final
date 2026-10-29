@@ -119,43 +119,42 @@ class PaperExchange:
 
 
 class PaperState:
-        def restore(self):
-            state = json.loads(self.state_path.read_text(encoding="utf-8"))
-            if (state["version"] != 1 or state["settings"] != self.settings()
-                    or state["fee_rate"] != self.exchange.fee_rate):
-                raise ValueError("State settings differ; use a new --state path or --reset")
-            wallet = float(state["balance_usdt"])
-            if not math.isfinite(wallet):
-                raise ValueError("Invalid saved wallet")
-            self.exchange.balance = wallet
-            self.exchange.positions = state["account_positions"]
-            self.exchange.prices = state["prices"]
-            self.exchange.trades = state["trades"]
-            self.positions = state["strategy_positions"]
-            self.last_trade = state["last_trade"]
-            if set(self.positions) != set(self.exchange.positions):
-                raise ValueError("Inconsistent saved positions")
+    def restore(self):
+        state = json.loads(self.state_path.read_text(encoding="utf-8"))
+        if (state["version"] != 1 or state["settings"] != self.settings()
+                or state["fee_rate"] != self.exchange.fee_rate):
+            raise ValueError("State settings differ; use a new --state path or --reset")
+        wallet = float(state["balance_usdt"])
+        if not math.isfinite(wallet):
+            raise ValueError("Invalid saved wallet")
+        self.exchange.balance = wallet
+        self.exchange.positions = state["account_positions"]
+        self.exchange.prices = state["prices"]
+        self.exchange.trades = state["trades"]
+        self.positions = state["strategy_positions"]
+        self.last_trade = state["last_trade"]
+        if set(self.positions) != set(self.exchange.positions):
+            raise ValueError("Inconsistent saved positions")
 
-        def save(self):
-            state = {
-                "version": 1, "initial_balance_usdt": 100.0,
-                "settings": self.settings(), "fee_rate": self.exchange.fee_rate,
-                "balance_usdt": self.exchange.balance, "equity_usdt": self.exchange.equity,
-                "free_usdt": self.exchange.free, "used_usdt": self.exchange.used,
-                "account_positions": self.exchange.positions,
-                "strategy_positions": self.positions, "prices": self.exchange.prices,
-                "last_trade": self.last_trade, "trades": self.exchange.trades,
-            }
-            self.state_path.parent.mkdir(parents=True, exist_ok=True)
-            temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
-            temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2, allow_nan=False),
-                                 encoding="utf-8")
-            temporary.replace(self.state_path)
+    def save(self):
+        state = {
+            "version": 1, "initial_balance_usdt": 100.0,
+            "settings": self.settings(), "fee_rate": self.exchange.fee_rate,
+            "balance_usdt": self.exchange.balance, "equity_usdt": self.exchange.equity,
+            "free_usdt": self.exchange.free, "used_usdt": self.exchange.used,
+            "account_positions": self.exchange.positions,
+            "strategy_positions": self.positions, "prices": self.exchange.prices,
+            "last_trade": self.last_trade, "trades": self.exchange.trades,
+        }
+        self.state_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = self.state_path.with_suffix(self.state_path.suffix + ".tmp")
+        temporary.write_text(json.dumps(state, ensure_ascii=False, indent=2, allow_nan=False),
+                             encoding="utf-8")
+        temporary.replace(self.state_path)
 
-        async def report(self):
-            while True:
-                strategy.log.info("PAPER | wallet=%.4f equity=%.4f free=%.4f used=%.4f positions=%d",
-                                  self.exchange.balance, self.exchange.equity,
-                                  self.exchange.free, self.exchange.used, len(self.positions))
-                await asyncio.sleep(30)
-
+    async def report(self):
+        while True:
+            strategy.log.info("PAPER | wallet=%.4f equity=%.4f free=%.4f used=%.4f positions=%d",
+                              self.exchange.balance, self.exchange.equity,
+                              self.exchange.free, self.exchange.used, len(self.positions))
+            await asyncio.sleep(30)
