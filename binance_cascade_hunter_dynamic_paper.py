@@ -19,22 +19,23 @@ class DynamicPaperExchange(PaperExchange):
 
 class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
     def __init__(self, state_path="paper_state_dynamic.json", fee_rate=0.0005,
-                 reset=False, market_data=None):
+                 reset=False, market_data=None, strategy_config=dynamic):
+        self.strategy = strategy_config
         # Neither real-trading initializer is invoked. No keys are accepted or loaded.
         public = market_data if market_data is not None else ccxt.binanceusdm({
             "enableRateLimit": True, "options": {"defaultType": "future"},
         })
-        self.exchange = DynamicPaperExchange(public, fee_rate, leverage=dynamic.LEVERAGE)
+        self.exchange = DynamicPaperExchange(public, fee_rate, leverage=self.strategy.LEVERAGE)
         self.positions = {}
         self.last_trade = {}
         self.lock = asyncio.Lock()
         self.state_path = Path(state_path)
         if self.state_path.exists() and not reset:
             self.restore()
-        self.scanner = ContinuousScanner(self)
+        self.scanner = ContinuousScanner(self, config=self.strategy)
 
     def settings(self):
-        return {"mode": "dynamic_scan", **{name: getattr(dynamic, name) for name in (
+        return {"mode": "dynamic_scan", **{name: getattr(self.strategy, name) for name in (
             "LEVERAGE", "MAX_POSITION_PCT", "CASCADE_THRESHOLD", "VOLUME_SPIKE",
             "TAKE_PROFIT_PCT", "STOP_LOSS_PCT", "COOLDOWN_SEC", "SCAN_INTERVAL",
             "MAX_SYMBOLS_TO_SCAN", "MAX_CONCURRENT_POSITIONS", "MIN_QUOTE_VOLUME",
@@ -42,12 +43,12 @@ class DynamicPaperHunter(dynamic.CascadeHunter, PaperCascadeHunter):
 
     async def enter(self, symbol, side, price):
         # scan_and_trade already owns the lock; reacquiring it here would deadlock.
-        result = await dynamic.CascadeHunter.enter(self, symbol, side, float(price))
+        result = await self.strategy.CascadeHunter.enter(self, symbol, side, float(price))
         self.save()
         return result
 
     async def manage_exits(self):
-        await dynamic.CascadeHunter.manage_exits(self)
+        await self.strategy.CascadeHunter.manage_exits(self)
         self.save()
 
     async def scan_loop(self):

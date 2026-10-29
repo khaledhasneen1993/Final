@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 
 import aiohttp
 
-import binance_cascade_hunter_dynamic as config
+import binance_cascade_hunter_dynamic as default_config
 
 WS_URL = "wss://fstream.binance.com/market/stream"
 MAX_EVENT_AGE = 10.0
@@ -39,8 +39,9 @@ def valid_rows(rows):
 
 
 class ContinuousScanner:
-    def __init__(self, bot, *, clock=time.monotonic, wall_clock=time.time):
+    def __init__(self, bot, *, config=default_config, clock=time.monotonic, wall_clock=time.time):
         self.bot = bot
+        self.config = config
         self.clock = clock
         self.wall_clock = wall_clock
         self.symbols = ()
@@ -49,7 +50,7 @@ class ContinuousScanner:
         self.event_times = {}
         self.received = {}
         self.last_book_check = {}
-        self.queue = asyncio.Queue(maxsize=config.MAX_SYMBOLS_TO_SCAN)
+        self.queue = asyncio.Queue(maxsize=self.config.MAX_SYMBOLS_TO_SCAN)
         self.pending = set()
         self.changed = asyncio.Event()
         self.ready = asyncio.Event()
@@ -71,23 +72,23 @@ class ContinuousScanner:
                 accepted.append(symbol)
                 self.stream_ids[symbol] = market.get("id") or symbol.split(":")[0].replace("/", "")
             except Exception as error:
-                config.log.warning("Skipping market %s: %s", symbol, error)
-        selected = tuple(accepted[:config.MAX_SYMBOLS_TO_SCAN])
+                self.config.log.warning("Skipping market %s: %s", symbol, error)
+        selected = tuple(accepted[:self.config.MAX_SYMBOLS_TO_SCAN])
         if selected != self.symbols:
             self.symbols = selected
             self.changed.set()
         self.ready.set()
-        config.log.info("CONTINUOUS UNIVERSE | symbols=%d | refresh=%ss", len(selected), config.SCAN_INTERVAL)
+        self.config.log.info("CONTINUOUS UNIVERSE | symbols=%d | refresh=%ss", len(selected), self.config.SCAN_INTERVAL)
 
     async def universe_loop(self):
         while True:
             try:
                 await self.refresh_universe()
             except Exception as error:
-                config.log.warning("Universe refresh failed: %s", error)
+                self.config.log.warning("Universe refresh failed: %s", error)
                 await asyncio.sleep(10)
                 continue
-            await asyncio.sleep(config.SCAN_INTERVAL)
+            await asyncio.sleep(self.config.SCAN_INTERVAL)
 
     async def seed(self, symbols):
         semaphore = asyncio.Semaphore(WORKERS)
@@ -99,7 +100,7 @@ class ContinuousScanner:
                     self.histories[symbol] = deque(valid_rows(rows), maxlen=30)
                     return symbol
                 except Exception as error:
-                    config.log.warning("Candle warmup failed %s: %s", symbol, error)
+                    self.config.log.warning("Candle warmup failed %s: %s", symbol, error)
                     return None
 
         return [s for s in await asyncio.gather(*(one(s) for s in symbols)) if s is not None]
@@ -156,12 +157,12 @@ class ContinuousScanner:
         ret = (rows[-1][4] - rows[-3][4]) / rows[-3][4]
         average = sum(r[5] for r in rows[-15:-3]) / 12
         spike = rows[-1][5] / average if average > 0 else 0
-        if abs(ret) <= config.CASCADE_THRESHOLD or spike <= config.VOLUME_SPIKE:
+        if abs(ret) <= self.config.CASCADE_THRESHOLD or spike <= self.config.VOLUME_SPIKE:
             return None
         return {"side": "buy" if ret > 0 else "sell", "price": rows[-1][4], "ret": ret, "spike": spike}
 
     async def evaluate(self, symbol):
-        if symbol in self.bot.positions or len(self.bot.positions) >= config.MAX_CONCURRENT_POSITIONS:
+        if symbol in self.bot.positions or len(self.bot.positions) >= self.config.MAX_CONCURRENT_POSITIONS:
             return
         signal = self.signal(symbol)
         now = self.clock()
@@ -185,12 +186,12 @@ class ContinuousScanner:
             imbalance = (bids - asks) / (bids + asks) if bids + asks else 0
         except Exception as error:
             self.book_pause_until = self.clock() + 5
-            config.log.warning("Order book check failed %s (backoff 5s): %s", symbol, error)
+            self.config.log.warning("Order book check failed %s (backoff 5s): %s", symbol, error)
             return
         async with self.bot.lock:
             signal = self.signal(symbol)
             if (signal is None or symbol in self.bot.positions
-                    or len(self.bot.positions) >= config.MAX_CONCURRENT_POSITIONS):
+                    or len(self.bot.positions) >= self.config.MAX_CONCURRENT_POSITIONS):
                 return
             if not ((signal["side"] == "buy" and imbalance > 0.35)
                     or (signal["side"] == "sell" and imbalance < -0.35)):
@@ -198,7 +199,7 @@ class ContinuousScanner:
             # First eligible completed check gets the slot; do not wait for all symbols.
             if await self.bot.enter(symbol, signal["side"], signal["price"]):
                 self.entries += 1
-                config.log.info("CONTINUOUS ENTRY %s | move=%.3f%% volume=%.2fx imbalance=%.3f",
+                self.config.log.info("CONTINUOUS ENTRY %s | move=%.3f%% volume=%.2fx imbalance=%.3f",
                                 symbol, signal["ret"] * 100, signal["spike"], imbalance)
 
     async def worker(self):
@@ -207,7 +208,7 @@ class ContinuousScanner:
             try:
                 await self.evaluate(symbol)
             except Exception as error:
-                config.log.warning("Continuous check failed %s: %s", symbol, error)
+                self.config.log.warning("Continuous check failed %s: %s", symbol, error)
             finally:
                 self.pending.discard(symbol)
                 self.queue.task_done()
@@ -248,7 +249,7 @@ class ContinuousScanner:
                     url = WS_URL + "?" + urlencode({"streams": streams})
                     async with session.ws_connect(url, heartbeat=20, receive_timeout=30) as socket:
                         self.connected = True
-                        config.log.info("CONTINUOUS WATCH CONNECTED | symbols=%d | entries checked on updates", len(warmed))
+                        self.config.log.info("CONTINUOUS WATCH CONNECTED | symbols=%d | entries checked on updates", len(warmed))
                         delay = 1
                         reader = asyncio.create_task(self.read_stream(socket))
                         change = asyncio.create_task(self.changed.wait())
@@ -265,14 +266,14 @@ class ContinuousScanner:
                             await asyncio.gather(reader, change, reseed, return_exceptions=True)
                 except Exception as error:
                     self.connected = False
-                    config.log.warning("Candle stream reconnect in %ss: %s", delay, error)
+                    self.config.log.warning("Candle stream reconnect in %ss: %s", delay, error)
                     await asyncio.sleep(delay)
                     delay = min(30, delay * 2)
 
     async def status_loop(self):
         while True:
             await asyncio.sleep(30)
-            config.log.info("CONTINUOUS STATUS | connected=%s symbols=%d events=%d book_checks=%d entries=%d",
+            self.config.log.info("CONTINUOUS STATUS | connected=%s symbols=%d events=%d book_checks=%d entries=%d",
                             self.connected, len(self.symbols), self.events, self.book_checks, self.entries)
 
     async def run(self):
