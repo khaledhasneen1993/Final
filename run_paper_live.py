@@ -162,14 +162,15 @@ async def run(bot, publisher=None, cloud_publisher=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="dashboard-config.json")
+    parser.add_argument("--legacy-dashboard", action="store_true", help="Also publish to the old private Sites dashboard")
     parser.add_argument("--resume", metavar="STATE_FILE", help="Resume a prior V2 session instead of creating one")
     args = parser.parse_args()
     config = None
-    if Path(args.config).is_file():
+    if args.legacy_dashboard:
         try:
             config = read_config(args.config)
         except (OSError, ValueError, TypeError):
-            parser.error("The existing dashboard-config.json is invalid")
+            parser.error("Legacy dashboard config is missing or invalid")
     if args.resume:
         state_path = Path(args.resume)
         if not state_path.is_file():
