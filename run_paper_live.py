@@ -187,7 +187,7 @@ def main():
     cloud_token = os.environ.get("CASCADE_DASHBOARD_TOKEN", "").strip()
     cloud_publisher = CloudPublisher(bot, session_id, cloud_token) if cloud_token else None
     if publisher is None and cloud_publisher is None:
-        parser.error("Set CASCADE_DASHBOARD_TOKEN or provide a valid dashboard-config.json")
+        parser.error("Set CASCADE_DASHBOARD_TOKEN, or use --legacy-dashboard with a valid config")
     if cloud_publisher:
         log.info("COMBINED DASHBOARD TELEMETRY ENABLED | session=%s", session_id)
     log.info("LIVE V2 PAPER | state=%s | margin=10%% | leverage=50x | price SL=15%% | max=3", state_path)
