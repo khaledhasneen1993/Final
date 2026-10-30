@@ -141,8 +141,10 @@ class CloudPublisher:
             log.warning("Combined dashboard final update unavailable; local state remains saved")
 
 
-async def run(bot, publisher, cloud_publisher=None):
-    tasks = [asyncio.create_task(bot.start()), asyncio.create_task(publisher.loop())]
+async def run(bot, publisher=None, cloud_publisher=None):
+    tasks = [asyncio.create_task(bot.start())]
+    if publisher is not None:
+        tasks.append(asyncio.create_task(publisher.loop()))
     if cloud_publisher is not None:
         tasks.append(asyncio.create_task(cloud_publisher.loop()))
     try:
@@ -151,7 +153,8 @@ async def run(bot, publisher, cloud_publisher=None):
         for task in tasks:
             task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        await publisher.stopped()
+        if publisher is not None:
+            await publisher.stopped()
         if cloud_publisher is not None:
             await cloud_publisher.stopped()
 
@@ -161,10 +164,12 @@ def main():
     parser.add_argument("--config", default="dashboard-config.json")
     parser.add_argument("--resume", metavar="STATE_FILE", help="Resume a prior V2 session instead of creating one")
     args = parser.parse_args()
-    try:
-        config = read_config(args.config)
-    except (OSError, ValueError, TypeError) as error:
-        parser.error("Download dashboard-config.json from the private dashboard and place it in this folder")
+    config = None
+    if Path(args.config).is_file():
+        try:
+            config = read_config(args.config)
+        except (OSError, ValueError, TypeError):
+            parser.error("The existing dashboard-config.json is invalid")
     if args.resume:
         state_path = Path(args.resume)
         if not state_path.is_file():
@@ -177,9 +182,11 @@ def main():
         session_id = "paper_state_live_" + stamp + "_" + uuid4().hex[:8]
         state_path = Path(session_id + ".json")
     bot = V2PaperHunter(state_path=state_path)
-    publisher = Publisher(bot, config, session_id)
+    publisher = Publisher(bot, config, session_id) if config else None
     cloud_token = os.environ.get("CASCADE_DASHBOARD_TOKEN", "").strip()
     cloud_publisher = CloudPublisher(bot, session_id, cloud_token) if cloud_token else None
+    if publisher is None and cloud_publisher is None:
+        parser.error("Set CASCADE_DASHBOARD_TOKEN or provide a valid dashboard-config.json")
     if cloud_publisher:
         log.info("COMBINED DASHBOARD TELEMETRY ENABLED | session=%s", session_id)
     log.info("LIVE V2 PAPER | state=%s | margin=10%% | leverage=50x | price SL=15%% | max=3", state_path)
